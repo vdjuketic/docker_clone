@@ -3,6 +3,8 @@ import sys
 
 
 def main(): 
+    command = sys.argv[3]
+    args = sys.argv[4:]
     print("Logs from your program will appear here!")
     completed_process = subprocess.run([command, *args], capture_output=True)
     print(completed_process.stdout.decode("utf-8"))
