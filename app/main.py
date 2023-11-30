@@ -26,7 +26,13 @@ def switch_namespace(temp_path):
 
 
 def download_layers(image, manifest, token, destination_dir):
-    manifest_version = manifest["schemaVersion"]
+    manifest_version = 0
+
+    match manifest["mediaType"]:
+        case "application/vnd.oci.image.index.v1+json":
+            manifest_version = 1
+        case "application/vnd.docker.distribution.manifest.v2+json":
+            manifest_version = 2
 
     digests = []
     if manifest_version == 1:
@@ -35,7 +41,6 @@ def download_layers(image, manifest, token, destination_dir):
     elif manifest_version == 2:
         for layer in manifest["layers"]:
             digests.append(layer["digest"])
-
     else:
         raise NotImplementedError("unsupported manifest version")
 
@@ -43,14 +48,10 @@ def download_layers(image, manifest, token, destination_dir):
         for digest in digests:
             req = request.Request(
                 f"https://registry.hub.docker.com/v2/library/{image}/blobs/{digest}",
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "Accept": "application/vnd.docker.distribution.manifest.v2+json",
-                },
+                headers={"Authorization": f"Bearer {token}"},
             )
             res = request.urlopen(req)
             f.write(res.read())
-
     tarfile.open("response.tgz").extractall(destination_dir)
 
 
@@ -71,20 +72,8 @@ def get_manifest(image, tag, token):
 
 
 def download_image(destination_dir, image, tag):
-    manifest_url = f"{REGISTRY_URL}/library/{image}/manifests/{tag}"
-
-    try:
-        res = request.urlopen(manifest_url)
-    except error.HTTPError as e:
-        auth = e.headers["www-authenticate"]
-        realm = re.search(r'realm="(.+?)"', auth).group(1)
-        service = re.search(r'service="(.+?)"', auth).group(1)
-        scope = re.search(r'scope="(.+?)"', auth).group(1)
-
-    auth_url = f"{realm}?service={service}&scope={scope}"
-    req = request.Request(auth_url)
-    res = request.urlopen(req)
-
+    token_url = f"https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/{image}:pull"
+    res = request.urlopen(token_url)
     auth_token = json.loads(res.read().decode("utf-8"))["token"]
 
     manifest = get_manifest(image, tag, auth_token)
@@ -93,6 +82,7 @@ def download_image(destination_dir, image, tag):
 
 
 def main():
+    print(sys.argv, file=sys.stdout)
     img = sys.argv[2]
     directory = sys.argv[3]
     args = sys.argv[4:]
