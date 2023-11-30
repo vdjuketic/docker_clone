@@ -82,15 +82,18 @@ def download_image(destination_dir, image, tag):
 
 
 def main():
-    print(sys.argv, file=sys.stdout)
     img = sys.argv[2]
     directory = sys.argv[3]
     args = sys.argv[4:]
 
     tmp_dir_path = tempfile.TemporaryDirectory()
 
-    image, tag = img.split(":")
-    download_image(tmp_dir_path.name, image, tag)
+    image = img.split(":")
+    tag = "latest"
+    if len(image) == 2:
+        tag = image[1]
+
+    download_image(tmp_dir_path.name, image[0], tag)
 
     switch_namespace(tmp_dir_path.name)
 
